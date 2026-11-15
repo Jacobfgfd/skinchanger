@@ -1459,9 +1459,9 @@ local function renderWeapons()
         end)
     end
     if #list == 0 then
-        local e = Instance.new("TextLabel"); e.Size=UDim2.new(1,0,0,40); e.BackgroundTransparency=1
-        e.Font=Enum.Font.GothamSemibold; e.TextSize=12
-        e.Text = rootValid(S.root) and "— empty —" or "join a match first"
+        local e = Instance.new("TextLabel"); e.Size=UDim2.new(1,0,0,80); e.BackgroundTransparency=1
+        e.Font=Enum.Font.GothamSemibold; e.TextSize=12; e.LayoutOrder=1
+        e.Text = rootValid(S.root) and "— empty —" or "waiting for match…"
         e.TextColor3=MUTED; e.TextWrapped=true; e.Parent=wList
     end
 end
@@ -1469,11 +1469,16 @@ end
 local function renderSkins()
     clearKids(sScroll)
     if not selectedWeapon then
-        local e = Instance.new("TextLabel"); e.Size=UDim2.new(1,0,0,40); e.BackgroundTransparency=1
-        e.Font=Enum.Font.Gotham; e.TextSize=12; e.Text="  pick a weapon on the left"
-        e.TextColor3=MUTED; e.TextXAlignment=Enum.TextXAlignment.Left; e.Parent=sScroll
+        grid.Parent = nil
+        local wrap = Instance.new("Frame"); wrap.Size=UDim2.fromScale(1,1); wrap.BackgroundTransparency=1; wrap.Parent=sScroll
+        local e = Instance.new("TextLabel"); e.AnchorPoint=Vector2.new(0.5,0.5)
+        e.Position=UDim2.fromScale(0.5,0.5); e.Size=UDim2.fromOffset(320,60)
+        e.BackgroundTransparency=1; e.Font=Enum.Font.GothamSemibold; e.TextSize=14
+        e.Text = rootValid(S.root) and "pick a weapon from the list" or "join a Rivals match first"
+        e.TextColor3=MUTED; e.Parent=wrap
         return
     end
+    grid.Parent = sScroll
     local kind = uiKind()
     local items = { "(default)" }
     local list = kind and S.cos.lists[kind] or S.skinsByWeapon[selectedWeapon]
@@ -1769,7 +1774,12 @@ task.spawn(function()
     while S.running and not S.stopReq do
         S.inTick = true; sliceAt = os.clock()
         local ok, err = pcall(tick); S.inTick = false
-        if not ok then log("error: %s", tostring(err)); setStatus(false, "error — rescanning"); S.root = nil; S.offsetsOk = false end
+        if not ok then
+            log("error: %s", tostring(err))
+            S.errBurst = (S.errBurst or 0) + 1
+            if S.errBurst >= 5 then setStatus(false, "scanning…"); S.errBurst = 0 end
+            S.root = nil; S.offsetsOk = false
+        else S.errBurst = 0 end
         if S.stopReq then break end
         task.wait(0.1)
     end
