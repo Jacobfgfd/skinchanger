@@ -14694,10 +14694,18 @@ return function(runtime,library)
         library.Options.Recovery_MenuKeybind:SetValue({'RightShift','Toggle'})
     end})
     local backendGroup=tabs.Settings:AddLeftGroupbox('Backend')
-    backendGroup:AddToggle('Recovery_Backend',{Text='Enable data spoofing',Default=false,Callback=safe(function(value)backend:SetEnabled(value)end)})
-    backendGroup:AddLabel('Spoofers change this client’s display; server balances and progression stay unchanged.')
+    backendGroup:AddToggle('Recovery_Backend',{Text='Master spoof switch',Default=true,Callback=safe(function(value)backend:SetEnabled(value);if value then backend:Refresh()end end)})
+    backendGroup:AddLabel('Client-side only — your real stats on the server are untouched.')
     backendGroup:AddButton({Text='Refresh client display',Func=safe(function()backend:Refresh()end)})
     backendGroup:AddButton({Text='Unload',Func=function()runtime:Unload()end})
+    local function ensureBackend()
+        if backend.Enabled then return end
+        pcall(function()backend:SetEnabled(true)end)
+        if library.Options.Recovery_Backend then library.Options.Recovery_Backend:SetValue(true)end
+    end
+    task.defer(function()pcall(function()
+        if not backend.Enabled then backend:SetEnabled(true)end
+    end)end)
     local identity=tabs.Spoofers:AddLeftGroupbox('Username')
     config.SpoofedName,config.SpoofedDisplayName='',''
     identity:AddInput('Recovery_Username',{Text='Username',Default='',Finished=true,Callback=function(value)config.SpoofedName=value end})
@@ -14709,10 +14717,13 @@ return function(runtime,library)
     local progression=tabs.Resources:AddRightGroupbox('Progression')
     local function numberControl(group,title,flag,field,default)
         config[flag],config[field]=false,default
-        group:AddToggle('Recovery_'..flag,{Text=title,Default=false,Callback=safe(function(value)config[flag]=value;backend:Refresh()end)})
+        group:AddToggle('Recovery_'..flag,{Text=title,Default=false,Callback=safe(function(value)
+            if value then ensureBackend()end
+            config[flag]=value;backend:Refresh()
+        end)})
         group:AddInput('Recovery_'..field,{Text=title..' value',Default=tostring(default),Numeric=true,Finished=true,Callback=safe(function(value)
             local number=tonumber(value);assert(number and number==number and math.abs(number)<1e12,'Enter a finite number')
-            config[field]=math.max(0,math.floor(number));backend:Refresh()
+            config[field]=math.max(0,math.floor(number));if config[flag]then ensureBackend()end;backend:Refresh()
         end)})
     end
     numberControl(profile,'Level','LevelSpoof','SpoofedLevel',100)
