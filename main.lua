@@ -1,13 +1,13 @@
 --!nocheck
 -- 616 :: rivals skinchanger (616 UI reskin)
 -- Built by Olivia. https://discord.gg/ojailbreaks
--- INSERT toggles menu. SHIFT+END unloads clean. Modal input lock while open.
+-- RIGHT SHIFT toggles menu. SHIFT+END unloads clean. Modal input lock while open.
 
 local PREV = _G.RivalsSkins
 if PREV and PREV.stop then pcall(PREV.stop) end
 
 local CFG = {
-    toggleKey = Enum.KeyCode.Insert,
+    toggleKey = Enum.KeyCode.RightShift,
     dir = "rivals_skins",
     allowMisfit = false,
     startOpen = true,
@@ -68,9 +68,17 @@ local function setStatus(ok, fmt, ...)
 end
 
 -- memory primitives
-local function rp(a) return memory_read("uintptr", a) or 0 end
-local function wp(a, v) memory_write("uintptr", a, v) end
-local function rb(a) return memory_read("byte", a) or 0 end
+local function rp(a)
+    if not a or a == 0 then return 0 end
+    local ok, v = pcall(memory_read, "uintptr", a)
+    return (ok and v) or 0
+end
+local function wp(a, v) pcall(memory_write, "uintptr", a, v) end
+local function rb(a)
+    if not a or a == 0 then return 0 end
+    local ok, v = pcall(memory_read, "byte", a)
+    return (ok and v) or 0
+end
 local function okp(p) return p ~= nil and p > 0x10000 and p < 0x7FFFFFFFFFFF end
 local function ptrOrZero(p) return p == 0 or okp(p) end
 local function ru32(a) return rb(a) + rb(a+1)*256 + rb(a+2)*65536 + rb(a+3)*16777216 end
@@ -1131,57 +1139,101 @@ for _, n in ipairs({"616_UI","616_LOGO","616_BACKDROP"}) do
     local old = host():FindFirstChild(n); if old then old:Destroy() end
 end
 
-local ACC, BG, PANEL, PANEL2, TEXT, MUTED =
-    Color3.fromRGB(230,25,40), Color3.fromRGB(10,10,12), Color3.fromRGB(18,18,22), Color3.fromRGB(26,26,32),
-    Color3.fromRGB(240,240,245), Color3.fromRGB(140,140,150)
-local function corner(i,r) local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,r or 8); c.Parent=i end
-local function stroke(i,t,col) local s=Instance.new("UIStroke"); s.Thickness=t or 1; s.Color=col or ACC; s.Parent=i end
-local function pad(i,p) local u=Instance.new("UIPadding"); u.PaddingTop=UDim.new(0,p); u.PaddingBottom=UDim.new(0,p); u.PaddingLeft=UDim.new(0,p); u.PaddingRight=UDim.new(0,p); u.Parent=i end
+local ACC      = Color3.fromRGB(240,40,60)
+local ACC_DIM  = Color3.fromRGB(150,20,35)
+local ACC_DARK = Color3.fromRGB(60,8,14)
+local BG       = Color3.fromRGB(8,8,10)
+local PANEL    = Color3.fromRGB(16,16,20)
+local PANEL2   = Color3.fromRGB(24,24,30)
+local PANEL3   = Color3.fromRGB(32,32,40)
+local TEXT     = Color3.fromRGB(245,245,250)
+local MUTED    = Color3.fromRGB(130,130,145)
+local function corner(i,r) local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,r or 8); c.Parent=i; return c end
+local function stroke(i,t,col,trans) local s=Instance.new("UIStroke"); s.Thickness=t or 1; s.Color=col or ACC; s.Transparency=trans or 0; s.Parent=i; return s end
+local function pad(i,p,l,r,b) local u=Instance.new("UIPadding"); u.PaddingTop=UDim.new(0,p); u.PaddingBottom=UDim.new(0,b or p); u.PaddingLeft=UDim.new(0,l or p); u.PaddingRight=UDim.new(0,r or p); u.Parent=i; return u end
+local function gradient(parent, c1, c2, rot, trans)
+    local g = Instance.new("UIGradient")
+    g.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0,c1), ColorSequenceKeypoint.new(1,c2) })
+    g.Rotation = rot or 90
+    if trans then g.Transparency = trans end
+    g.Parent = parent
+    return g
+end
+local function hoverSwap(btn, idle, hot)
+    btn.MouseEnter:Connect(function() TS:Create(btn, TweenInfo.new(0.15), { BackgroundColor3 = hot }):Play() end)
+    btn.MouseLeave:Connect(function() TS:Create(btn, TweenInfo.new(0.15), { BackgroundColor3 = idle }):Play() end)
+end
 
 local Backdrop = Instance.new("ScreenGui"); Backdrop.Name="616_BACKDROP"; Backdrop.IgnoreGuiInset=true
 Backdrop.DisplayOrder=9998; Backdrop.ResetOnSpawn=false; Backdrop.Parent=host()
 local dim = Instance.new("Frame"); dim.Size=UDim2.fromScale(1,1); dim.BackgroundColor3=Color3.new(0,0,0)
 dim.BackgroundTransparency=1; dim.BorderSizePixel=0; dim.Parent=Backdrop
-local grad = Instance.new("UIGradient"); grad.Color=ColorSequence.new({
-    ColorSequenceKeypoint.new(0,Color3.new(0,0,0)),
-    ColorSequenceKeypoint.new(1,Color3.fromRGB(30,0,5))
-}); grad.Rotation=90; grad.Parent=dim
+local vignette = Instance.new("UIGradient")
+vignette.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(10,0,3)),
+    ColorSequenceKeypoint.new(0.5, Color3.new(0,0,0)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(14,0,4))
+})
+vignette.Rotation = 135; vignette.Parent = dim
 local block = Instance.new("TextButton"); block.Size=UDim2.fromScale(1,1); block.BackgroundTransparency=1
 block.Text=""; block.AutoButtonColor=false; block.Modal=true; block.Parent=Backdrop
 
 local LogoGui = Instance.new("ScreenGui"); LogoGui.Name="616_LOGO"; LogoGui.IgnoreGuiInset=true
 LogoGui.DisplayOrder=9999; LogoGui.ResetOnSpawn=false; LogoGui.Parent=host()
-local ring = Instance.new("Frame"); ring.AnchorPoint=Vector2.new(0.5,0.5); ring.Position=UDim2.fromScale(0.5,0.5)
-ring.Size=UDim2.fromOffset(340,340); ring.BackgroundTransparency=1; ring.Parent=LogoGui
-local rs2 = Instance.new("Frame"); rs2.AnchorPoint=Vector2.new(0.5,0.5); rs2.Position=UDim2.fromScale(0.5,0.5)
-rs2.Size=UDim2.fromScale(1,1); rs2.BackgroundTransparency=1; rs2.Parent=ring
-local rsc=Instance.new("UICorner"); rsc.CornerRadius=UDim.new(1,0); rsc.Parent=rs2
-local rsk=Instance.new("UIStroke"); rsk.Thickness=2; rsk.Color=ACC; rsk.Transparency=0.4; rsk.Parent=rs2
-local tickRing = Instance.new("Frame"); tickRing.AnchorPoint=Vector2.new(0.5,0.5); tickRing.Position=UDim2.fromScale(0.5,0.5)
-tickRing.Size=UDim2.fromScale(0.85,0.85); tickRing.BackgroundTransparency=1; tickRing.Parent=ring
-for i=0,23 do
+local ringHost = Instance.new("Frame"); ringHost.AnchorPoint=Vector2.new(0.5,0.5); ringHost.Position=UDim2.fromScale(0.5,0.5)
+ringHost.Size=UDim2.fromOffset(460,460); ringHost.BackgroundTransparency=1; ringHost.Parent=LogoGui
+
+-- outer ring
+local outerRing = Instance.new("Frame"); outerRing.AnchorPoint=Vector2.new(0.5,0.5); outerRing.Position=UDim2.fromScale(0.5,0.5)
+outerRing.Size=UDim2.fromScale(1,1); outerRing.BackgroundTransparency=1; outerRing.Parent=ringHost
+corner(outerRing,9999); stroke(outerRing,1,ACC,0.65)
+-- mid rotating ring (dashed via tick marks)
+local midRing = Instance.new("Frame"); midRing.AnchorPoint=Vector2.new(0.5,0.5); midRing.Position=UDim2.fromScale(0.5,0.5)
+midRing.Size=UDim2.fromScale(0.82,0.82); midRing.BackgroundTransparency=1; midRing.Parent=ringHost
+for i=0,35 do
     local t=Instance.new("Frame"); t.AnchorPoint=Vector2.new(0.5,0.5)
-    t.Size=UDim2.fromOffset(3,14); t.BackgroundColor3=ACC; t.BackgroundTransparency=0.3
-    t.BorderSizePixel=0; t.Rotation=i*15
-    local a=math.rad(i*15-90); local r=130
+    t.Size=UDim2.fromOffset(2, i%3==0 and 18 or 10)
+    t.BackgroundColor3=ACC; t.BackgroundTransparency = i%3==0 and 0.1 or 0.55
+    t.BorderSizePixel=0; t.Rotation=i*10
+    local a=math.rad(i*10-90); local r=180
     t.Position=UDim2.fromScale(0.5,0.5)+UDim2.fromOffset(math.cos(a)*r,math.sin(a)*r)
-    t.Parent=tickRing
+    t.Parent=midRing
 end
+-- inner solid ring
+local innerRing = Instance.new("Frame"); innerRing.AnchorPoint=Vector2.new(0.5,0.5); innerRing.Position=UDim2.fromScale(0.5,0.5)
+innerRing.Size=UDim2.fromScale(0.62,0.62); innerRing.BackgroundTransparency=1; innerRing.Parent=ringHost
+corner(innerRing,9999); stroke(innerRing,2,ACC,0.2)
+-- glow halo behind text
+local halo = Instance.new("Frame"); halo.AnchorPoint=Vector2.new(0.5,0.5); halo.Position=UDim2.fromScale(0.5,0.5)
+halo.Size=UDim2.fromScale(0.5,0.5); halo.BackgroundColor3=ACC_DARK; halo.BackgroundTransparency=0.4
+halo.BorderSizePixel=0; halo.Parent=ringHost; corner(halo,9999)
+gradient(halo, ACC, Color3.fromRGB(80,0,10), 90)
+
 local logo = Instance.new("TextLabel"); logo.AnchorPoint=Vector2.new(0.5,0.5); logo.Position=UDim2.fromScale(0.5,0.5)
-logo.Size=UDim2.fromOffset(240,200); logo.BackgroundTransparency=1; logo.Text="616"
-logo.Font=Enum.Font.GothamBlack; logo.TextSize=140; logo.TextColor3=ACC
-logo.TextStrokeTransparency=0.6; logo.TextStrokeColor3=Color3.fromRGB(255,0,30); logo.Parent=ring
+logo.Size=UDim2.fromOffset(320,220); logo.BackgroundTransparency=1; logo.Text="616"
+logo.Font=Enum.Font.GothamBlack; logo.TextSize=180; logo.TextColor3=TEXT
+logo.TextStrokeTransparency=0.3; logo.TextStrokeColor3=ACC; logo.Parent=ringHost
+local logoGrad = gradient(logo, Color3.fromRGB(255,80,100), ACC, 90)
+
+local sub = Instance.new("TextLabel"); sub.AnchorPoint=Vector2.new(0.5,0)
+sub.Position=UDim2.new(0.5,0,0.5,110); sub.Size=UDim2.fromOffset(300,24)
+sub.BackgroundTransparency=1; sub.Font=Enum.Font.GothamBold; sub.TextSize=12
+sub.Text="S I X   O N E   S I X"; sub.TextColor3=ACC; sub.TextTransparency=0.3
+sub.Parent=ringHost
+
 LogoGui.Enabled=false; Backdrop.Enabled=false
 
 local spinConn
 local function startSpin()
     if spinConn then return end
     spinConn = RunService.RenderStepped:Connect(function(dt)
-        rs2.Rotation = (rs2.Rotation + dt*55) % 360
-        tickRing.Rotation = (tickRing.Rotation - dt*30) % 360
+        midRing.Rotation   = (midRing.Rotation   + dt*45) % 360
+        outerRing.Rotation = (outerRing.Rotation - dt*20) % 360
+        innerRing.Rotation = (innerRing.Rotation + dt*35) % 360
         local p = math.sin(tick()*2)*0.5+0.5
-        logo.TextTransparency = 0.05 + p*0.25
-        logo.TextStrokeTransparency = 0.4 + p*0.3
+        halo.BackgroundTransparency = 0.35 + p*0.25
+        halo.Size = UDim2.fromScale(0.48 + p*0.06, 0.48 + p*0.06)
+        logo.TextStrokeTransparency = 0.25 + p*0.3
     end)
 end
 local function stopSpin() if spinConn then spinConn:Disconnect(); spinConn=nil end end
@@ -1189,26 +1241,50 @@ local function stopSpin() if spinConn then spinConn:Disconnect(); spinConn=nil e
 local Main = Instance.new("ScreenGui"); Main.Name="616_UI"; Main.IgnoreGuiInset=true
 Main.DisplayOrder=10000; Main.ResetOnSpawn=false; Main.Parent=host()
 local win = Instance.new("Frame"); win.AnchorPoint=Vector2.new(0.5,0.5); win.Position=UDim2.fromScale(0.5,0.5)
-win.Size=UDim2.fromOffset(880,560); win.BackgroundColor3=BG; win.BackgroundTransparency=0.05
-win.BorderSizePixel=0; win.Parent=Main; corner(win,12); stroke(win,1,Color3.fromRGB(60,10,15))
+win.Size=UDim2.fromOffset(940,620); win.BackgroundColor3=BG; win.BackgroundTransparency=0.02
+win.BorderSizePixel=0; win.Parent=Main; corner(win,14); stroke(win,1,ACC_DARK,0.2)
+gradient(win, Color3.fromRGB(14,10,12), Color3.fromRGB(8,6,8), 135)
+
+-- subtle outer glow via inner frame
+local glow = Instance.new("Frame"); glow.Size=UDim2.new(1,4,1,4); glow.Position=UDim2.fromOffset(-2,-2)
+glow.BackgroundTransparency=1; glow.Parent=win; corner(glow,16); stroke(glow,1,ACC,0.7)
 
 -- header
-local hdr = Instance.new("Frame"); hdr.Size=UDim2.new(1,0,0,56); hdr.BackgroundColor3=PANEL
-hdr.BorderSizePixel=0; hdr.Parent=win; corner(hdr,12)
-local brand=Instance.new("TextLabel"); brand.Size=UDim2.new(0,120,1,0); brand.Position=UDim2.fromOffset(16,0)
-brand.BackgroundTransparency=1; brand.Font=Enum.Font.GothamBlack; brand.TextSize=30; brand.Text="616"
-brand.TextColor3=ACC; brand.TextXAlignment=Enum.TextXAlignment.Left; brand.Parent=hdr
-local subt=Instance.new("TextLabel"); subt.Size=UDim2.new(1,-440,1,0); subt.Position=UDim2.fromOffset(120,0)
-subt.BackgroundTransparency=1; subt.Font=Enum.Font.Gotham; subt.TextSize=13
-subt.Text="  rivals skinchanger  ·  INSERT toggle  ·  SHIFT+END unload"
-subt.TextColor3=MUTED; subt.TextXAlignment=Enum.TextXAlignment.Left; subt.Parent=hdr
+local hdr = Instance.new("Frame"); hdr.Size=UDim2.new(1,0,0,64); hdr.BackgroundColor3=PANEL
+hdr.BorderSizePixel=0; hdr.Parent=win; corner(hdr,14)
+gradient(hdr, Color3.fromRGB(22,14,18), Color3.fromRGB(14,10,12), 90)
+local hdrLine = Instance.new("Frame"); hdrLine.Size=UDim2.new(1,0,0,1); hdrLine.Position=UDim2.new(0,0,1,-1)
+hdrLine.BackgroundColor3=ACC_DARK; hdrLine.BorderSizePixel=0; hdrLine.BackgroundTransparency=0.3; hdrLine.Parent=hdr
+gradient(hdrLine, ACC_DARK, Color3.fromRGB(0,0,0), 0, NumberSequence.new({
+    NumberSequenceKeypoint.new(0,1), NumberSequenceKeypoint.new(0.5,0), NumberSequenceKeypoint.new(1,1)
+}))
 
-local function hbtn(text, x, w, cb)
-    local b=Instance.new("TextButton"); b.Size=UDim2.fromOffset(w,32); b.Position=UDim2.new(1,-x,0,12)
-    b.BackgroundColor3=PANEL2; b.BorderSizePixel=0; b.Text=text; b.Font=Enum.Font.GothamSemibold
-    b.TextSize=13; b.TextColor3=TEXT; b.AutoButtonColor=false; b.Parent=hdr; corner(b,6)
-    b.MouseEnter:Connect(function() b.BackgroundColor3=ACC end)
-    b.MouseLeave:Connect(function() b.BackgroundColor3=PANEL2 end)
+-- brand chip
+local chip = Instance.new("Frame"); chip.Size=UDim2.fromOffset(72,40); chip.Position=UDim2.fromOffset(16,12)
+chip.BackgroundColor3=ACC; chip.BorderSizePixel=0; chip.Parent=hdr; corner(chip,8)
+gradient(chip, Color3.fromRGB(255,60,80), ACC_DIM, 135)
+stroke(chip, 1, Color3.fromRGB(255,120,140), 0.5)
+local chipTxt=Instance.new("TextLabel"); chipTxt.Size=UDim2.fromScale(1,1); chipTxt.BackgroundTransparency=1
+chipTxt.Font=Enum.Font.GothamBlack; chipTxt.TextSize=22; chipTxt.Text="616"
+chipTxt.TextColor3=Color3.fromRGB(255,255,255); chipTxt.TextStrokeTransparency=0.5
+chipTxt.TextStrokeColor3=ACC_DARK; chipTxt.Parent=chip
+
+local subt=Instance.new("TextLabel"); subt.Size=UDim2.new(1,-520,0,20); subt.Position=UDim2.fromOffset(100,14)
+subt.BackgroundTransparency=1; subt.Font=Enum.Font.GothamBold; subt.TextSize=14
+subt.Text="rivals skinchanger"; subt.TextColor3=TEXT
+subt.TextXAlignment=Enum.TextXAlignment.Left; subt.Parent=hdr
+local subt2=Instance.new("TextLabel"); subt2.Size=UDim2.new(1,-520,0,18); subt2.Position=UDim2.fromOffset(100,34)
+subt2.BackgroundTransparency=1; subt2.Font=Enum.Font.Gotham; subt2.TextSize=11
+subt2.Text="RIGHT SHIFT  toggle   ·   SHIFT+END  unload"; subt2.TextColor3=MUTED
+subt2.TextXAlignment=Enum.TextXAlignment.Left; subt2.Parent=hdr
+
+local function hbtn(text, x, w, cb, accentFill)
+    local b=Instance.new("TextButton"); b.Size=UDim2.fromOffset(w,34); b.Position=UDim2.new(1,-x,0,15)
+    b.BackgroundColor3 = accentFill and ACC_DIM or PANEL2; b.BorderSizePixel=0
+    b.Text=text; b.Font=Enum.Font.GothamSemibold; b.TextSize=12
+    b.TextColor3=TEXT; b.AutoButtonColor=false; b.Parent=hdr; corner(b,7)
+    stroke(b, 1, accentFill and ACC or ACC_DARK, accentFill and 0.3 or 0.6)
+    hoverSwap(b, accentFill and ACC_DIM or PANEL2, ACC)
     if cb then b.MouseButton1Click:Connect(cb) end
     return b
 end
@@ -1242,81 +1318,96 @@ local function clearAll()
     S.desiredChanged = true; S.uiDirty = true; savePicks()
 end
 
-local bR = hbtn("Rescan",    330, 90, function() Core.scan(); Cos.scan(); S.uiDirty = true end)
-local bX = hbtn("Restore",   230, 90, function() if selectedWeapon then
+local bR  = hbtn("Rescan",    360, 92, function() Core.scan(); Cos.scan(); S.uiDirty = true end)
+local bX  = hbtn("Restore",   258, 92, function() if selectedWeapon then
     local kind = uiKind()
     if kind then pickCos(kind, selectedWeapon, "(default)") else pick(selectedWeapon, "(default)") end
 end end)
-local bCl = hbtn("Clear all", 132, 90, function() clearAll() end)
-local bC  = hbtn("×",          42, 32)
+local bCl = hbtn("Clear all", 156, 92, function() clearAll() end, true)
+local bC  = hbtn("×",          46, 34)
 bC.Font = Enum.Font.GothamBold; bC.TextSize = 20
 
 -- category tabs
-local tabStrip = Instance.new("Frame"); tabStrip.Size=UDim2.new(1,-24,0,32); tabStrip.Position=UDim2.fromOffset(12,62)
+local tabStrip = Instance.new("Frame"); tabStrip.Size=UDim2.new(1,-28,0,36); tabStrip.Position=UDim2.fromOffset(14,74)
 tabStrip.BackgroundTransparency=1; tabStrip.Parent=win
 local tLay = Instance.new("UIListLayout"); tLay.FillDirection=Enum.FillDirection.Horizontal
-tLay.Padding=UDim.new(0,6); tLay.Parent=tabStrip
-local tabButtons = {}
+tLay.Padding=UDim.new(0,4); tLay.Parent=tabStrip
+local tabButtons, tabIndicators = {}, {}
 for _, cat in ipairs(CATEGORIES) do
     local t = Instance.new("TextButton")
-    t.Size = UDim2.fromOffset(#cat*8 + 20, 28)
-    t.BackgroundColor3 = cat == UI.cat and ACC or PANEL2
+    t.Size = UDim2.fromOffset(#cat*7 + 24, 32)
+    t.BackgroundColor3 = cat == UI.cat and PANEL3 or PANEL
     t.BorderSizePixel = 0; t.Text = cat; t.Font = Enum.Font.GothamSemibold
-    t.TextSize = 12; t.TextColor3 = cat == UI.cat and Color3.fromRGB(10,10,10) or TEXT
-    t.AutoButtonColor = false; t.Parent = tabStrip; corner(t, 6)
-    tabButtons[cat] = t
+    t.TextSize = 12; t.TextColor3 = cat == UI.cat and TEXT or MUTED
+    t.AutoButtonColor = false; t.Parent = tabStrip; corner(t, 7)
+    local bar = Instance.new("Frame"); bar.Size = UDim2.new(1,-16,0,2); bar.Position = UDim2.new(0,8,1,-4)
+    bar.BackgroundColor3 = ACC; bar.BorderSizePixel = 0; bar.Visible = cat == UI.cat; bar.Parent = t; corner(bar,2)
+    tabButtons[cat] = t; tabIndicators[cat] = bar
     t.MouseButton1Click:Connect(function()
         UI.cat = cat; selectedWeapon = nil
         for n, b in pairs(tabButtons) do
-            b.BackgroundColor3 = n == cat and ACC or PANEL2
-            b.TextColor3 = n == cat and Color3.fromRGB(10,10,10) or TEXT
+            b.BackgroundColor3 = n == cat and PANEL3 or PANEL
+            b.TextColor3 = n == cat and TEXT or MUTED
+            tabIndicators[n].Visible = n == cat
         end
         S.uiDirty = true
     end)
+    t.MouseEnter:Connect(function() if cat ~= UI.cat then t.TextColor3 = TEXT end end)
+    t.MouseLeave:Connect(function() if cat ~= UI.cat then t.TextColor3 = MUTED end end)
 end
 
 -- body
-local body = Instance.new("Frame"); body.Size=UDim2.new(1,0,1,-56-32-56); body.Position=UDim2.fromOffset(0,100)
+local body = Instance.new("Frame"); body.Size=UDim2.new(1,0,1,-64-36-56); body.Position=UDim2.fromOffset(0,114)
 body.BackgroundTransparency=1; body.Parent=win
 
-local side = Instance.new("Frame"); side.Size=UDim2.new(0,240,1,-20); side.Position=UDim2.fromOffset(12,10)
-side.BackgroundColor3=PANEL; side.BorderSizePixel=0; side.Parent=body; corner(side,10); pad(side,10)
-local sT=Instance.new("TextLabel"); sT.Size=UDim2.new(1,0,0,18); sT.BackgroundTransparency=1
-sT.Font=Enum.Font.GothamSemibold; sT.TextSize=11; sT.Text="PICK ONE"; sT.TextColor3=MUTED
+local side = Instance.new("Frame"); side.Size=UDim2.new(0,260,1,-20); side.Position=UDim2.fromOffset(14,10)
+side.BackgroundColor3=PANEL; side.BorderSizePixel=0; side.Parent=body; corner(side,12); pad(side,14,12,12,12)
+stroke(side, 1, ACC_DARK, 0.5)
+gradient(side, Color3.fromRGB(20,16,18), PANEL, 90)
+local sT=Instance.new("TextLabel"); sT.Size=UDim2.new(1,0,0,16); sT.BackgroundTransparency=1
+sT.Font=Enum.Font.GothamBold; sT.TextSize=10; sT.Text="WEAPON  ·  PICK ONE"; sT.TextColor3=ACC
 sT.TextXAlignment=Enum.TextXAlignment.Left; sT.Parent=side
-local wList=Instance.new("ScrollingFrame"); wList.Size=UDim2.new(1,0,1,-24); wList.Position=UDim2.fromOffset(0,24)
+local wList=Instance.new("ScrollingFrame"); wList.Size=UDim2.new(1,0,1,-24); wList.Position=UDim2.fromOffset(0,22)
 wList.BackgroundTransparency=1; wList.BorderSizePixel=0; wList.CanvasSize=UDim2.fromOffset(0,0)
-wList.AutomaticCanvasSize=Enum.AutomaticSize.Y; wList.ScrollBarThickness=3; wList.ScrollBarImageColor3=ACC
-wList.Parent=side
-local wL=Instance.new("UIListLayout"); wL.Padding=UDim.new(0,3); wL.Parent=wList
+wList.AutomaticCanvasSize=Enum.AutomaticSize.Y; wList.ScrollBarThickness=4; wList.ScrollBarImageColor3=ACC
+wList.ScrollBarImageTransparency=0.4; wList.Parent=side
+local wL=Instance.new("UIListLayout"); wL.Padding=UDim.new(0,4); wL.Parent=wList
 
-local right=Instance.new("Frame"); right.Size=UDim2.new(1,-264,1,-20); right.Position=UDim2.fromOffset(260,10)
-right.BackgroundColor3=PANEL; right.BorderSizePixel=0; right.Parent=body; corner(right,10); pad(right,12)
-local search=Instance.new("TextBox"); search.Size=UDim2.new(1,0,0,32); search.BackgroundColor3=PANEL2
-search.BorderSizePixel=0; search.Font=Enum.Font.Gotham; search.TextSize=13; search.PlaceholderText="  search…"
+local right=Instance.new("Frame"); right.Size=UDim2.new(1,-288,1,-20); right.Position=UDim2.fromOffset(282,10)
+right.BackgroundColor3=PANEL; right.BorderSizePixel=0; right.Parent=body; corner(right,12); pad(right,14)
+stroke(right, 1, ACC_DARK, 0.5)
+gradient(right, Color3.fromRGB(20,16,18), PANEL, 90)
+local search=Instance.new("TextBox"); search.Size=UDim2.new(1,0,0,36); search.BackgroundColor3=PANEL2
+search.BorderSizePixel=0; search.Font=Enum.Font.Gotham; search.TextSize=13; search.PlaceholderText="search skins…"
 search.Text=""; search.ClearTextOnFocus=false; search.TextColor3=TEXT; search.PlaceholderColor3=MUTED
-search.TextXAlignment=Enum.TextXAlignment.Left; search.Parent=right; corner(search,6); pad(search,8)
-local sScroll=Instance.new("ScrollingFrame"); sScroll.Size=UDim2.new(1,0,1,-44); sScroll.Position=UDim2.fromOffset(0,40)
+search.TextXAlignment=Enum.TextXAlignment.Left; search.Parent=right; corner(search,8); pad(search,8,12,12,8)
+stroke(search, 1, ACC_DARK, 0.4)
+search.Focused:Connect(function() TS:Create(search:FindFirstChildOfClass("UIStroke"), TweenInfo.new(0.2), {Transparency=0.1, Color=ACC}):Play() end)
+search.FocusLost:Connect(function() TS:Create(search:FindFirstChildOfClass("UIStroke"), TweenInfo.new(0.2), {Transparency=0.4, Color=ACC_DARK}):Play() end)
+local sScroll=Instance.new("ScrollingFrame"); sScroll.Size=UDim2.new(1,0,1,-48); sScroll.Position=UDim2.fromOffset(0,44)
 sScroll.BackgroundTransparency=1; sScroll.BorderSizePixel=0; sScroll.CanvasSize=UDim2.fromOffset(0,0)
-sScroll.AutomaticCanvasSize=Enum.AutomaticSize.Y; sScroll.ScrollBarThickness=3; sScroll.ScrollBarImageColor3=ACC
-sScroll.Parent=right
-local grid=Instance.new("UIGridLayout"); grid.CellSize=UDim2.fromOffset(180,54); grid.CellPadding=UDim2.fromOffset(6,6)
+sScroll.AutomaticCanvasSize=Enum.AutomaticSize.Y; sScroll.ScrollBarThickness=4; sScroll.ScrollBarImageColor3=ACC
+sScroll.ScrollBarImageTransparency=0.4; sScroll.Parent=right
+local grid=Instance.new("UIGridLayout"); grid.CellSize=UDim2.fromOffset(196,62); grid.CellPadding=UDim2.fromOffset(8,8)
 grid.SortOrder=Enum.SortOrder.Name; grid.Parent=sScroll
 
 -- footer
-local footer = Instance.new("Frame"); footer.Size=UDim2.new(1,-24,0,40); footer.Position=UDim2.new(0,12,1,-48)
-footer.BackgroundTransparency=1; footer.Parent=win
-local dot = Instance.new("Frame"); dot.Size=UDim2.fromOffset(8,8); dot.Position=UDim2.fromOffset(0,10)
+local footer = Instance.new("Frame"); footer.Size=UDim2.new(1,-28,0,44); footer.Position=UDim2.new(0,14,1,-50)
+footer.BackgroundColor3=PANEL; footer.BorderSizePixel=0; footer.Parent=win; corner(footer,10); pad(footer,10,14,14,10)
+stroke(footer, 1, ACC_DARK, 0.6)
+local dot = Instance.new("Frame"); dot.Size=UDim2.fromOffset(10,10); dot.Position=UDim2.fromOffset(0,7)
 dot.BackgroundColor3=ACC; dot.BorderSizePixel=0; dot.Parent=footer
-corner(dot, 4)
-local status=Instance.new("TextLabel"); status.Size=UDim2.new(1,-20,0,24); status.Position=UDim2.fromOffset(18,4)
-status.BackgroundTransparency=1; status.Font=Enum.Font.Gotham; status.TextSize=12
-status.Text=""; status.TextColor3=MUTED; status.TextXAlignment=Enum.TextXAlignment.Left; status.Parent=footer
+corner(dot, 9999); stroke(dot, 2, ACC, 0.6)
+local status=Instance.new("TextLabel"); status.Size=UDim2.new(1,-24,1,0); status.Position=UDim2.fromOffset(20,0)
+status.BackgroundTransparency=1; status.Font=Enum.Font.GothamSemibold; status.TextSize=12
+status.Text=""; status.TextColor3=TEXT; status.TextXAlignment=Enum.TextXAlignment.Left; status.Parent=footer
 
 -- renderers
 local function clearKids(p)
     for _, c in ipairs(p:GetChildren()) do
-        if c:IsA("TextButton") or c:IsA("Frame") then c:Destroy() end
+        if not (c:IsA("UIListLayout") or c:IsA("UIGridLayout") or c:IsA("UIPadding") or c:IsA("UICorner") or c:IsA("UIStroke")) then
+            c:Destroy()
+        end
     end
 end
 
@@ -1335,23 +1426,33 @@ local function renderWeapons()
     end
     local desired = kind and S.cos.desired[kind] or S.desired
     for _, w in ipairs(list) do
-        local b = Instance.new("TextButton"); b.Size=UDim2.new(1,0,0,28)
+        local b = Instance.new("TextButton"); b.Size=UDim2.new(1,0,0,32)
         local sel = w == selectedWeapon
-        b.BackgroundColor3 = sel and ACC or PANEL2
-        b.BorderSizePixel = 0
-        b.Text = "  " .. w
-        b.TextColor3 = sel and Color3.fromRGB(10,10,10) or TEXT
-        b.Font = Enum.Font.GothamSemibold; b.TextSize = 12
-        b.TextXAlignment = Enum.TextXAlignment.Left
-        b.AutoButtonColor = false; b.Parent = wList; corner(b, 5)
-        -- mark
+        b.BackgroundColor3 = sel and ACC_DIM or PANEL2
+        b.BorderSizePixel = 0; b.Text = ""
+        b.AutoButtonColor = false; b.Parent = wList; corner(b, 7)
+        if sel then
+            gradient(b, ACC, ACC_DIM, 90)
+            stroke(b, 1, ACC, 0.2)
+        else
+            stroke(b, 1, ACC_DARK, 0.7)
+        end
+        local lbl = Instance.new("TextLabel"); lbl.Size=UDim2.new(1,-100,1,0); lbl.Position=UDim2.fromOffset(12,0)
+        lbl.BackgroundTransparency=1; lbl.Font=Enum.Font.GothamSemibold; lbl.TextSize=12
+        lbl.Text=w; lbl.TextColor3=sel and TEXT or Color3.fromRGB(210,210,220)
+        lbl.TextXAlignment=Enum.TextXAlignment.Left; lbl.Parent=b
         local d = desired[w]
         if d then
             local mark = Instance.new("TextLabel")
-            mark.Size = UDim2.new(0, 60, 1, 0); mark.Position = UDim2.new(1, -66, 0, 0)
-            mark.BackgroundTransparency = 1; mark.Font = Enum.Font.Gotham; mark.TextSize = 10
-            mark.Text = "→ " .. d; mark.TextColor3 = sel and Color3.fromRGB(30,30,30) or ACC
-            mark.TextXAlignment = Enum.TextXAlignment.Right; mark.Parent = b
+            mark.Size = UDim2.new(0, 84, 1, 0); mark.Position = UDim2.new(1, -92, 0, 0)
+            mark.BackgroundTransparency = 1; mark.Font = Enum.Font.GothamBold; mark.TextSize = 9
+            mark.Text = d; mark.TextColor3 = sel and TEXT or ACC
+            mark.TextXAlignment = Enum.TextXAlignment.Right; mark.TextTruncate=Enum.TextTruncate.AtEnd
+            mark.Parent = b
+        end
+        if not sel then
+            b.MouseEnter:Connect(function() TS:Create(b, TweenInfo.new(0.12), {BackgroundColor3=PANEL3}):Play() end)
+            b.MouseLeave:Connect(function() TS:Create(b, TweenInfo.new(0.12), {BackgroundColor3=PANEL2}):Play() end)
         end
         b.MouseButton1Click:Connect(function()
             selectedWeapon = w; S.uiDirty = true
@@ -1359,8 +1460,8 @@ local function renderWeapons()
     end
     if #list == 0 then
         local e = Instance.new("TextLabel"); e.Size=UDim2.new(1,0,0,40); e.BackgroundTransparency=1
-        e.Font=Enum.Font.Gotham; e.TextSize=12
-        e.Text = rootValid(S.root) and "nothing here" or "join a match first"
+        e.Font=Enum.Font.GothamSemibold; e.TextSize=12
+        e.Text = rootValid(S.root) and "— empty —" or "join a match first"
         e.TextColor3=MUTED; e.TextWrapped=true; e.Parent=wList
     end
 end
@@ -1387,34 +1488,48 @@ local function renderSkins()
         if show then
             local chosen = (name == "(default)" and picked == nil) or name == picked
             local card = Instance.new("TextButton")
-            card.BackgroundColor3 = chosen and ACC or PANEL2
+            card.BackgroundColor3 = chosen and ACC_DIM or PANEL2
             card.BorderSizePixel = 0; card.Text = ""; card.AutoButtonColor = false
-            card.Parent = sScroll; corner(card, 7)
-            local n = Instance.new("TextLabel"); n.Size=UDim2.new(1,-12,0,20); n.Position=UDim2.fromOffset(10,8)
-            n.BackgroundTransparency=1; n.Font=Enum.Font.GothamSemibold; n.TextSize=12
-            n.Text = name; n.TextColor3 = chosen and Color3.fromRGB(10,10,10) or TEXT
-            n.TextXAlignment=Enum.TextXAlignment.Left; n.Parent=card
-            local st = Instance.new("TextLabel"); st.Size=UDim2.new(1,-12,0,16); st.Position=UDim2.fromOffset(10,28)
-            st.BackgroundTransparency=1; st.Font=Enum.Font.Gotham; st.TextSize=10
-            local lbl = "tap to pick"
+            card.Parent = sScroll; corner(card, 9)
+            if chosen then
+                gradient(card, ACC, ACC_DIM, 135)
+                stroke(card, 1, Color3.fromRGB(255,120,140), 0.4)
+            else
+                stroke(card, 1, ACC_DARK, 0.65)
+            end
+            local accentBar = Instance.new("Frame"); accentBar.Size=UDim2.new(0,3,1,-16); accentBar.Position=UDim2.fromOffset(6,8)
+            accentBar.BackgroundColor3=chosen and TEXT or ACC; accentBar.BorderSizePixel=0
+            accentBar.BackgroundTransparency=chosen and 0 or 0.4; accentBar.Parent=card; corner(accentBar,2)
+            local n = Instance.new("TextLabel"); n.Size=UDim2.new(1,-24,0,20); n.Position=UDim2.fromOffset(16,10)
+            n.BackgroundTransparency=1; n.Font=Enum.Font.GothamBold; n.TextSize=13
+            n.Text = name; n.TextColor3 = chosen and TEXT or Color3.fromRGB(230,230,240)
+            n.TextXAlignment=Enum.TextXAlignment.Left; n.TextTruncate=Enum.TextTruncate.AtEnd
+            n.Parent=card
+            local st = Instance.new("TextLabel"); st.Size=UDim2.new(1,-24,0,14); st.Position=UDim2.fromOffset(16,32)
+            st.BackgroundTransparency=1; st.Font=Enum.Font.GothamSemibold; st.TextSize=9
+            local lbl = "TAP TO EQUIP"
             if chosen then
                 if kind then
                     local rec = S.cos.applied[kind] and S.cos.applied[kind][selectedWeapon]
-                    lbl = (rec and rec.to == name) and "APPLIED" or "waiting"
+                    lbl = (rec and rec.to == name) and "APPLIED" or "WAITING"
                 else
                     local ap = S.applied[selectedWeapon]
                     local ov = S.over[selectedWeapon]
                     if name == "(default)" then
                         lbl = "DEFAULT"
                     elseif ap and ap.skin == name then
-                        lbl = (ov and ov.skin == name) and "APPLIED" or "model only"
+                        lbl = (ov and ov.skin == name) and "APPLIED" or "MODEL ONLY"
                     else
-                        lbl = "waiting"
+                        lbl = "WAITING"
                     end
                 end
             end
-            st.Text = lbl; st.TextColor3 = chosen and Color3.fromRGB(30,30,30) or MUTED
+            st.Text = lbl; st.TextColor3 = chosen and Color3.fromRGB(255,220,225) or MUTED
             st.TextXAlignment=Enum.TextXAlignment.Left; st.Parent=card
+            if not chosen then
+                card.MouseEnter:Connect(function() TS:Create(card, TweenInfo.new(0.12), {BackgroundColor3=PANEL3}):Play() end)
+                card.MouseLeave:Connect(function() TS:Create(card, TweenInfo.new(0.12), {BackgroundColor3=PANEL2}):Play() end)
+            end
             card.MouseButton1Click:Connect(function()
                 if kind then pickCos(kind, selectedWeapon, name)
                 else pick(selectedWeapon, name) end
@@ -1425,7 +1540,9 @@ end
 
 local function renderStatus()
     status.Text = S.status or ""
-    dot.BackgroundColor3 = S.statusOk and ACC or Color3.fromRGB(230,180,30)
+    local col = S.statusOk and ACC or Color3.fromRGB(240,180,40)
+    dot.BackgroundColor3 = col
+    for _, c in ipairs(dot:GetChildren()) do if c:IsA("UIStroke") then c.Color = col end end
 end
 
 local function refresh()
@@ -1441,7 +1558,10 @@ local function setOpen(v)
     Backdrop.Enabled = v; LogoGui.Enabled = v; Main.Enabled = v
     if v then
         startSpin()
-        TS:Create(dim, TweenInfo.new(0.25), { BackgroundTransparency = 0.35 }):Play()
+        TS:Create(dim, TweenInfo.new(0.3), { BackgroundTransparency = 0.3 }):Play()
+        win.Size = UDim2.fromOffset(880, 580)
+        TS:Create(win, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+            { Size = UDim2.fromOffset(940,620) }):Play()
         refresh()
     else
         stopSpin(); dim.BackgroundTransparency = 1
@@ -1657,6 +1777,6 @@ task.spawn(function()
 end)
 
 pcall(function()
-    StarterGui:SetCore("SendNotification", { Title="616", Text="loaded. INSERT = menu.", Duration=4 })
+    StarterGui:SetCore("SendNotification", { Title="616", Text="loaded. RIGHT SHIFT = menu.", Duration=4 })
 end)
 setOpen(CFG.startOpen)
